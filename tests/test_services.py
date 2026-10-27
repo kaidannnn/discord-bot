@@ -108,3 +108,39 @@ def test_supervisor_rolls_back_failed_release(tmp_path,monkeypatch):
     assert launched==[bad,good]
     assert len(backups)==2
     assert (tmp_path/'LAST_GOOD').read_text().strip()==good
+
+@pytest.mark.parametrize('running',[False,True])
+@pytest.mark.parametrize('failure',[OSError,PermissionError,bootstrap.sqlite3.OperationalError])
+def test_backup_failure_preserves_running_release(tmp_path,monkeypatch,running,failure):
+    good='a'*40; bad='b'*40
+    pointer=tmp_path/'CURRENT'; pointer.write_text(good if running else bad)
+    monkeypatch.setattr(bootstrap,'ROOT',tmp_path)
+    monkeypatch.setattr(bootstrap,'STOP',False)
+    monkeypatch.setattr(bootstrap,'load_dotenv',lambda *a:None)
+    monkeypatch.setattr(bootstrap.signal,'signal',lambda *a:None)
+    clock=[1000]; launched=[]; terminated=[]; sleeps=[0]; attempts=[0]
+    monkeypatch.setattr(bootstrap.time,'time',lambda:clock[0])
+    class Process:
+        stopped=False
+        def poll(self): return 0 if self.stopped else None
+        def terminate(self): self.stopped=True; terminated.append(1)
+        def wait(self,**k): return 0
+    def launch(sha): launched.append(sha); return Process()
+    def backup():
+        attempts[0]+=1
+        if not running or attempts[0]>1: raise failure('simulated backup failure')
+    def sleep(_):
+        sleeps[0]+=1; clock[0]+=40
+        if running: pointer.write_text(bad)
+        if sleeps[0]>=3:
+            assert terminated==[]
+            bootstrap.STOP=True
+    monkeypatch.setattr(bootstrap.time,'sleep',sleep)
+    monkeypatch.setattr(bootstrap,'launch',launch)
+    monkeypatch.setattr(bootstrap,'predeploy_backup',backup)
+    monkeypatch.setattr(bootstrap,'healthy',lambda sha,started:True)
+    monkeypatch.setattr(bootstrap,'prune_releases',lambda keep:None)
+    bootstrap.main()
+    assert launched==([good] if running else [])
+    assert len(terminated)==int(running)  # graceful final shutdown only
+    assert attempts[0]>=2

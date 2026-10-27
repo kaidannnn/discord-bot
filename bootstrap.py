@@ -88,8 +88,14 @@ def main():
             if not wanted: time.sleep(3); continue
             if wanted in rejected: wanted=previous
             if wanted and wanted!=current and time.time()>=retry_after:
+                try:
+                    predeploy_backup()
+                except (OSError, sqlite3.Error) as exc:
+                    print('Kai-Bot: mise à jour différée, sauvegarde impossible',type(exc).__name__,flush=True)
+                    retry_after=time.time()+30
+                    time.sleep(3)
+                    continue
                 terminate(child); child=None
-                predeploy_backup()
                 current=wanted; ready=False; started=time.time()
                 try: child=launch(current)
                 except Exception as exc:

@@ -25,3 +25,7 @@ Date : 26 octobre 2026. Nom exact demandé : **Kai-Bot**, sous toutes les répon
 ## Définition de terminé
 
 Socle testé + code durable sur GitHub + version téléchargeable + documentation claire. Déploiement actif et sauvegarde externe réussie ne peuvent être déclarés que sur preuves des services réels. La restauration complète des fonctionnalités historiques demeure un chantier jusqu’à clôture de l’inventaire.
+
+## Correction du 27 octobre 2026
+
+Après autorisation explicite de publication sur le dépôt public, correction du superviseur : sauvegarde avant arrêt, erreurs de sauvegarde gérées, version active conservée et nouvelle tentative différée. Six tests ajoutés ; suite complète : 83 tests et 6 sous-tests réussis. Aucun secret ni donnée de joueur ajouté.
