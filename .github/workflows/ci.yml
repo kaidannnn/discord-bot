@@ -1,0 +1,50 @@
+name: Kai-Bot tests and deploy
+on:
+  push:
+    branches: [main, kai-bot-rebuild]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: kai-bot-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - run: python -m compileall -q core cogs main.py bootstrap.py scripts
+      - run: python -m pytest -q
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.KATABUMP_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: katabump
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install paramiko==3.5.1
+      - name: Configure trusted host key
+        env:
+          HOST_KEYS: ${{ secrets.SFTP_KNOWN_HOSTS }}
+        run: |
+          test -n "$HOST_KEYS"
+          printf '%s\n' "$HOST_KEYS" > "$RUNNER_TEMP/known_hosts"
+          chmod 600 "$RUNNER_TEMP/known_hosts"
+      - name: Publish release over SFTP
+        env:
+          SFTP_HOST: ${{ secrets.SFTP_HOST }}
+          SFTP_PORT: ${{ secrets.SFTP_PORT }}
+          SFTP_USERNAME: ${{ secrets.SFTP_USERNAME }}
+          SFTP_PASSWORD: ${{ secrets.SFTP_PASSWORD }}
+          SFTP_ROOT: ${{ vars.SFTP_ROOT }}
+          SFTP_KNOWN_HOSTS_FILE: ${{ runner.temp }}/known_hosts
+        run: python scripts/deploy_sftp.py
